@@ -1,0 +1,47 @@
+name: girlsfrontline-deobfuscator-workflow
+
+on:
+  workflow_dispatch:
+
+jobs:
+  girlsfrontline-deobfuscator-job:
+    runs-on: windows-latest
+    steps:
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v1
+      with:
+        dotnet-version: 3.1.x
+    - name: Checkout Il2CppInspector
+      uses: actions/checkout@v2
+      with:
+        repository: djkaty/Il2CppInspector
+        submodules: recursive
+        path: Il2CppInspector
+    - name: Restore Il2CppInspector dependencies
+      run: dotnet restore
+      working-directory: Il2CppInspector
+    - name: Build Il2CppInspector
+      run: dotnet build --no-restore --configuration Debug
+      working-directory: Il2CppInspector
+    - name: Checkout Il2CppInspectorPlugins
+      uses: actions/checkout@v2
+      with:
+        repository: djkaty/Il2CppInspectorPlugins
+        path: Il2CppInspectorPlugins    
+    - name: Checkout girlsfrontline-deobfuscator
+      uses: actions/checkout@v2
+      with:
+        path: Il2CppInspectorPlugins/Loaders/girlsfrontline-deobfuscator    
+    - name: Restore girlsfrontline-deobfuscator dependencies
+      run: dotnet restore
+      working-directory: Il2CppInspectorPlugins/Loaders/girlsfrontline-deobfuscator
+    - name: Build girlsfrontline-deobfuscator
+      run: dotnet build --no-restore --configuration Release
+      working-directory: Il2CppInspectorPlugins/Loaders/girlsfrontline-deobfuscator
+    - name: Upload girlsfrontline-deobfuscator build artifact
+      uses: actions/upload-artifact@v2.2.4
+      with:
+        name: girlsfrontline-deobfuscator.dll
+        path: Il2CppInspectorPlugins/Loaders/girlsfrontline-deobfuscator/bin/Release/netcoreapp3.1/girlsfrontline-deobfuscator.dll
+        if-no-files-found: error
+        retention-days: 0
