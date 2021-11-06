@@ -1,12 +1,17 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.IO;
 using System.Linq;
+using System.Text.Json;
+using System.Text.RegularExpressions;
 using Il2CppInspector;
 using Il2CppInspector.PluginAPI;
 using Il2CppInspector.PluginAPI.V100;
+using Il2CppInspector.Reflection;
 using NoisyCowStudios.Bin2Object;
 using static Loader.Utils;
+using Assembly = System.Reflection.Assembly;
 
 namespace Loader
 {
@@ -25,8 +30,28 @@ namespace Loader
         public string Id => "girlsfrontline-deobfuscator";
         public string Name => "Girls' Frontline Deobfuscator";
         public string Author => "neko-gg";
-        public string Version => "1.0";
+        public string Version => "1.1";
         public string Description => "Enables loading of Girls' Frontline (少女前线)";
+
+        private string PreferredArch { get; set; } = null;
+
+        private readonly PluginOptionBoolean _stcExportEnabledOption = new PluginOptionBoolean
+        {
+            Name = "stc-export-enabled",
+            Description = "Export STC format files",
+            Value = true,
+            Required = true
+        };
+
+        private readonly PluginOptionFilePath _stcFormatPathOption = new PluginOptionFilePath
+        {
+            Name = "stc-format-path",
+            Description = "Output folder for STC format files\n⚠️This directory and all its content will be deleted!",
+            IsFolder = true,
+            MustExist = true,
+            Value = Path.Combine(Path.GetDirectoryName(Assembly.GetEntryAssembly().Location), "stc"),
+            Required = true
+        };
 
         private readonly PluginOptionNumber<uint> _headerKeySeed0Option = new PluginOptionNumber<uint>
         {
@@ -110,6 +135,8 @@ namespace Loader
 
         public List<IPluginOption> Options => new List<IPluginOption>
         {
+            _stcExportEnabledOption,
+            _stcFormatPathOption,
             _headerKeySeed0Option,
             _headerKeySeed1Option,
             _headerKeySeed2Option,
@@ -119,6 +146,11 @@ namespace Loader
             _bodyKeySeedOption,
             _binaryXorStripeSizeOption
         };
+
+        public Plugin()
+        {
+            _stcFormatPathOption.If = () => _stcExportEnabledOption.Value;
+        }
 
         public void PreProcessMetadata(BinaryObjectStream stream, PluginPreProcessMetadataEventInfo info)
         {
@@ -191,6 +223,8 @@ namespace Loader
                 return;
             }
 
+            if (String.IsNullOrEmpty(PreferredArch) || stream.Arch == "ARM64") PreferredArch = stream.Arch;
+
             PluginServices.For(this).StatusUpdate($"Decrypting {stream.Arch} IL2CPP binary image");
             Dictionary<string, Section> sections = stream.GetSections().GroupBy(s => s.Name).ToDictionary(s => s.Key, s => s.First());
 
@@ -220,6 +254,34 @@ namespace Loader
             XorSection(stream, roDataSection, stripeSize, firstBlockLength, oddMostCommonByte, evenMostCommonByte);
 
             info.IsStreamModified = true;
+        }
+
+        public void PostProcessTypeModel(TypeModel model, PluginPostProcessTypeModelEventInfo data)
+        {
+            if (!_stcExportEnabledOption.Value)
+            {
+                Debug.WriteLine("STC format files export is disabled; skipping");
+                return;
+            }
+
+            if (PreferredArch != model.Package.BinaryImage.Arch)
+            {
+                Debug.WriteLine($"skipping STC format files export for arch {model.Package.BinaryImage.Arch}");
+                return;
+            }
+
+            PluginServices.For(this).StatusUpdate("Exporting STC format files");
+
+            Directory.Delete(_stcFormatPathOption.Value, true);
+
+            Dictionary<int, StcFormat> stcFormatDictionary = model.TypesByFullName["Cmd.CmdDef"]
+                                                                  .DeclaredFields
+                                                                  .Where(field => field.FieldType.IsEnum)
+                                                                  .ToDictionary(field => (int) field.DefaultValue, field => GetStcFormat(model, field));
+
+
+            ExportGflDataMinerStcFormatFiles(stcFormatDictionary);
+            ExportGfDecompressStcFormatFiles(stcFormatDictionary);
         }
 
         private static byte MostCommonByte(IFileFormatStream stream, long imageStart, long offset, int count)
@@ -264,6 +326,60 @@ namespace Loader
             if (extraCount != 0)
                 firstBlockLength += stripeSize - extraCount;
             return (int) firstBlockLength;
+        }
+
+        private StcFormat GetStcFormat(TypeModel model, FieldInfo fieldInfo)
+        {
+            string name = new Regex("^stc(.*)List$").Replace(fieldInfo.Name, "$1").ToLowerInvariant();
+            return new StcFormat
+            {
+                Name = name,
+                Fields = model.TypesByFullName[$"Cmd.Stc{name[0].ToString().ToUpperInvariant()}{name.Substring(1)}"]
+                              .DeclaredFields
+                              .Where(field => field.IsPublic)
+                              .Select(field => field.Name)
+                              .ToList()
+            };
+        }
+
+        private void ExportGflDataMinerStcFormatFiles(Dictionary<int, StcFormat> stcFormatDictionary)
+        {
+            JsonSerializerOptions jsonSerializerOptions = new JsonSerializerOptions
+            {
+                PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+                WriteIndented = true
+            };
+
+            foreach (var stcFormatEntry in stcFormatDictionary)
+            {
+                FileInfo file = new FileInfo(Path.Combine(_stcFormatPathOption.Value, "gfl-data-miner", $"{stcFormatEntry.Key}.json"));
+                Debug.Assert(file.Directory != null, "stc file directory cannot be null");
+                file.Directory.Create();
+
+                string jsonData = JsonSerializer.Serialize(stcFormatEntry.Value, jsonSerializerOptions);
+
+                // very crude way to pretty print STC format files with 4 spaces instead of 2
+                string formattedJsonData = new[] {4, 2}.Select(n => new string(' ', n))
+                                                       .Aggregate(jsonData, (acc, s) => new Regex($"^{s}(?! )(.*)", RegexOptions.Multiline).Replace(acc, $"{s}{s}$1"));
+
+                File.WriteAllText(file.FullName, formattedJsonData);
+            }
+        }
+
+        private void ExportGfDecompressStcFormatFiles(Dictionary<int, StcFormat> stcFormatDictionary)
+        {
+            foreach (var stcFormatEntry in stcFormatDictionary)
+            {
+                FileInfo file = new FileInfo(Path.Combine(_stcFormatPathOption.Value, "GFDecompress", $"{stcFormatEntry.Key}.format"));
+                Debug.Assert(file.Directory != null, "stc file directory cannot be null");
+                file.Directory.Create();
+
+                string formatData = String.Join(Environment.NewLine, stcFormatEntry.Value.Fields);
+                File.WriteAllText(file.FullName, formatData);
+            }
+
+            string gfDecompressMapping = String.Join($",{Environment.NewLine}", stcFormatDictionary.Select(e => $"{{ \"{e.Key}.stc\", \"{e.Value.Name}\" }}"));
+            File.WriteAllText(Path.Combine(_stcFormatPathOption.Value, "GFDecompress", "mapping.txt"), gfDecompressMapping);
         }
     }
 }
