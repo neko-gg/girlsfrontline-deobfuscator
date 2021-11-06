@@ -49,7 +49,7 @@ namespace Loader
             Description = "Output folder for STC format files\n⚠️This directory and all its content will be deleted!",
             IsFolder = true,
             MustExist = false,
-            Value = Path.Combine(Path.GetDirectoryName(Assembly.GetEntryAssembly().Location), "stc"),
+            Value = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "girls-frontline", "stc-format"),
             Required = true
         };
 
@@ -272,7 +272,11 @@ namespace Loader
 
             PluginServices.For(this).StatusUpdate("Exporting STC format files");
 
-            Directory.Delete(_stcFormatPathOption.Value, true);
+            if (Directory.Exists(_stcFormatPathOption.Value))
+            {
+                Debug.WriteLine($"recursively deleting directory ${_stcFormatPathOption.Value}");
+                Directory.Delete(_stcFormatPathOption.Value, true);
+            }
 
             Dictionary<int, StcFormat> stcFormatDictionary = model.TypesByFullName["Cmd.CmdDef"]
                                                                   .DeclaredFields
