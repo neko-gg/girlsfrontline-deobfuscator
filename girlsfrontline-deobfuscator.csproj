@@ -6,15 +6,15 @@
 
     <ItemGroup>
         <Reference Include="Bin2Object">
-            <HintPath>..\..\..\Il2CppInspector\Il2CppInspector.Common\bin\Debug\netcoreapp3.1\Bin2Object.dll</HintPath>
+            <HintPath>..\..\..\Il2CppInspector\Il2CppInspector.Common\bin\Release\netcoreapp3.1\Bin2Object.dll</HintPath>
         </Reference>
         <Reference Include="Il2CppInspector.Common">
-            <HintPath>..\..\..\Il2CppInspector\Il2CppInspector.Common\bin\Debug\netcoreapp3.1\Il2CppInspector.Common.dll</HintPath>
+            <HintPath>..\..\..\Il2CppInspector\Il2CppInspector.Common\bin\Release\netcoreapp3.1\Il2CppInspector.Common.dll</HintPath>
         </Reference>
     </ItemGroup>
 
     <Target Name="PostBuild" AfterTargets="PostBuildEvent">
-        <Exec Command="mkdir $(SolutionDir)..\..\..\Il2CppInspector\Il2CppInspector.GUI\bin\Debug\netcoreapp3.1\win-x64\plugins\$(ProjectName)&#xD;&#xA;mkdir $(SolutionDir)..\..\..\Il2CppInspector\Il2CppInspector.CLI\bin\Debug\netcoreapp3.1\win-x64\plugins\$(ProjectName)&#xD;&#xA;copy /y $(TargetPath) $(SolutionDir)..\..\..\Il2CppInspector\Il2CppInspector.GUI\bin\Debug\netcoreapp3.1\win-x64\plugins\$(ProjectName)&#xD;&#xA;copy /y $(TargetPath) $(SolutionDir)..\..\..\Il2CppInspector\Il2CppInspector.CLI\bin\Debug\netcoreapp3.1\win-x64\plugins\$(ProjectName)" />
+        <Exec Command="mkdir $(SolutionDir)..\..\..\Il2CppInspector\Il2CppInspector.GUI\bin\Release\netcoreapp3.1\win-x64\plugins\$(ProjectName)&#xD;&#xA;mkdir $(SolutionDir)..\..\..\Il2CppInspector\Il2CppInspector.CLI\bin\Release\netcoreapp3.1\win-x64\plugins\$(ProjectName)&#xD;&#xA;copy /y $(TargetPath) $(SolutionDir)..\..\..\Il2CppInspector\Il2CppInspector.GUI\bin\Release\netcoreapp3.1\win-x64\plugins\$(ProjectName)&#xD;&#xA;copy /y $(TargetPath) $(SolutionDir)..\..\..\Il2CppInspector\Il2CppInspector.CLI\bin\Release\netcoreapp3.1\win-x64\plugins\$(ProjectName)" />
     </Target>
-    
+
 </Project>

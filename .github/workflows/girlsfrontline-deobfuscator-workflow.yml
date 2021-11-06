@@ -21,17 +21,17 @@ jobs:
       run: dotnet restore
       working-directory: Il2CppInspector
     - name: Build Il2CppInspector
-      run: dotnet build --no-restore --configuration Debug
+      run: dotnet build --no-restore --configuration Release
       working-directory: Il2CppInspector
     - name: Checkout Il2CppInspectorPlugins
       uses: actions/checkout@v2
       with:
         repository: djkaty/Il2CppInspectorPlugins
-        path: Il2CppInspectorPlugins    
+        path: Il2CppInspectorPlugins
     - name: Checkout girlsfrontline-deobfuscator
       uses: actions/checkout@v2
       with:
-        path: Il2CppInspectorPlugins/Loaders/girlsfrontline-deobfuscator    
+        path: Il2CppInspectorPlugins/Loaders/girlsfrontline-deobfuscator
     - name: Restore girlsfrontline-deobfuscator dependencies
       run: dotnet restore
       working-directory: Il2CppInspectorPlugins/Loaders/girlsfrontline-deobfuscator
