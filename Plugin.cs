@@ -48,7 +48,7 @@ namespace Loader
             Name = "stc-format-path",
             Description = "Output folder for STC format files\n⚠️This directory and all its content will be deleted!",
             IsFolder = true,
-            MustExist = true,
+            MustExist = false,
             Value = Path.Combine(Path.GetDirectoryName(Assembly.GetEntryAssembly().Location), "stc"),
             Required = true
         };
